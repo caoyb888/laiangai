@@ -75,6 +75,9 @@ class CharDiffEngine:
                 pos_b += len(text)
                 total_change_chars += len(text)
 
+        if self.cleanup_semantic:
+            spans = self._absorb_short_trailing_equals(spans)
+
         total_len = max(len(text_a), len(text_b), 1)
         similarity = 1.0 - total_change_chars / total_len
 
@@ -83,6 +86,66 @@ class CharDiffEngine:
             total_changes=total_change_chars,
             similarity=round(similarity, 4),
         )
+
+    @staticmethod
+    def _absorb_short_trailing_equals(spans: list[CharDiffSpan]) -> list[CharDiffSpan]:
+        """
+        后处理：将 DELETE/INSERT 对后紧跟的短等值片段（≤ 等值前差异长度的字符）
+        吸收到 DELETE 和 INSERT 中，使中文数字词等多字单元作为整体显示。
+
+        例：DELETE "三" + INSERT "六" + EQUAL "十..." → DELETE "三十" + INSERT "六十" + EQUAL "..."
+
+        此操作是无损的（被吸收的字符同时加入 DELETE 和 INSERT）。
+        """
+        result = list(spans)
+        i = 0
+        while i < len(result) - 1:
+            span = result[i]
+            # 找到 DELETE 后紧跟 INSERT（或反向）的位置
+            if span.op == DiffOp.DELETE and i + 1 < len(result) and result[i + 1].op == DiffOp.INSERT:
+                del_span = result[i]
+                ins_span = result[i + 1]
+                eq_idx = i + 2
+            elif span.op == DiffOp.INSERT and i + 1 < len(result) and result[i + 1].op == DiffOp.DELETE:
+                ins_span = result[i]
+                del_span = result[i + 1]
+                eq_idx = i + 2
+            else:
+                i += 1
+                continue
+
+            # 检查紧跟的 EQUAL span
+            if eq_idx >= len(result) or result[eq_idx].op != DiffOp.EQUAL:
+                i += 1
+                continue
+
+            eq_span = result[eq_idx]
+            absorb_len = len(del_span.text)  # 吸收与 DELETE 等长的字符
+            if absorb_len == 0 or absorb_len > len(eq_span.text):
+                i += 1
+                continue
+
+            absorbed = eq_span.text[:absorb_len]
+            remaining = eq_span.text[absorb_len:]
+
+            new_del = CharDiffSpan(DiffOp.DELETE, del_span.text + absorbed, del_span.pos_a, del_span.pos_b)
+            new_ins = CharDiffSpan(DiffOp.INSERT, ins_span.text + absorbed, ins_span.pos_a, ins_span.pos_b)
+
+            # 重建这段 spans
+            prefix = result[:i]
+            suffix_start = eq_idx + 1
+            if span.op == DiffOp.DELETE:
+                rebuilt = [new_del, new_ins]
+            else:
+                rebuilt = [new_ins, new_del]
+
+            if remaining:
+                rebuilt.append(CharDiffSpan(DiffOp.EQUAL, remaining, eq_span.pos_a + absorb_len, eq_span.pos_b + absorb_len))
+
+            result = prefix + rebuilt + result[suffix_start:]
+            i += 1
+
+        return result
 
     def diff_paragraphs(
         self,
