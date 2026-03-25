@@ -1,0 +1,27 @@
+/* 差异颜色体系——全局统一，禁止局部硬编码，见 CLAUDE.md §6.2 */
+:root {
+  --diff-delete-bg:     #ffd7d7;
+  --diff-delete-text:   #d32f2f;
+  --diff-delete-border: #ef9a9a;
+
+  --diff-insert-bg:     #d7ffd7;
+  --diff-insert-text:   #2e7d32;
+  --diff-insert-border: #a5d6a7;
+
+  --diff-modify-bg:     #fff9d7;
+  --diff-modify-text:   #f57f17;
+  --diff-modify-border: #ffe082;
+
+  --diff-move-bg:       #d7eaff;
+  --diff-move-text:     #1565c0;
+  --diff-move-border:   #90caf9;
+
+  --diff-risk-critical: #d32f2f;
+  --diff-risk-major:    #f57c00;
+  --diff-risk-minor:    #388e3c;
+
+  /* 布局 */
+  --sidebar-width: 260px;
+  --header-height: 56px;
+  --panel-gap: 8px;
+}
