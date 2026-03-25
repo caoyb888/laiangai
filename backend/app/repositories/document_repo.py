@@ -56,11 +56,7 @@ class DocumentRepository:
         self,
         doc_id: str,
         status: ParseStatus,
-        *,
         error: str | None = None,
-        title: str | None = None,
-        word_count: int | None = None,
-        page_count: int | None = None,
     ) -> None:
         doc = await self.get_by_id(doc_id)
         if not doc:
@@ -68,12 +64,28 @@ class DocumentRepository:
         doc.parse_status = status
         if error is not None:
             doc.parse_error = error
+        await self.db.flush()
+
+    async def update_meta(
+        self,
+        doc_id: str,
+        *,
+        title: str | None = None,
+        word_count: int | None = None,
+        page_count: int | None = None,
+        parse_status: ParseStatus | None = None,
+    ) -> None:
+        doc = await self.get_by_id(doc_id)
+        if not doc:
+            return
         if title is not None:
             doc.title = title
         if word_count is not None:
             doc.word_count = word_count
         if page_count is not None:
             doc.page_count = page_count
+        if parse_status is not None:
+            doc.parse_status = parse_status
         await self.db.flush()
 
     async def list_by_user(
