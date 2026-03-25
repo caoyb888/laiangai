@@ -1,0 +1,36 @@
+# 环境变量（禁止提交，见 CLAUDE.md §9.3）
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Node
+node_modules/
+dist/
+.pnpm-store/
+
+# 模型权重（通过独立渠道管理，见 CLAUDE.md §9.3）
+backend/models_weights/
+*.bin
+*.safetensors
+
+# 上传文档（禁止提交真实文档）
+backend/uploads/
+backend/tests/fixtures/real_*/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Claude Code 本地配置（禁止提交）
+.claude/
