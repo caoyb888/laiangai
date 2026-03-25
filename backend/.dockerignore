@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+tests/
+alembic/
+*.md
+.env
+.env.*
+models_weights/
+uploads/

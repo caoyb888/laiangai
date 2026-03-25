@@ -1,0 +1,51 @@
+# 开发环境覆盖，见 CLAUDE.md §10.1
+# 使用方式：docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+version: "3.9"
+
+services:
+
+  lgdoc-backend:
+    build:
+      context: ./backend
+      target: dev
+    volumes:
+      - ./backend/app:/app/app          # 热重载：挂载源码
+      - ./backend/app/services/prompts:/app/app/services/prompts
+    environment:
+      APP_ENV: dev
+      LLM_API_MOCK: "true"              # 开发环境默认 Mock LLM，见 CLAUDE.md §10.1
+      LOG_LEVEL: DEBUG
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --log-level debug
+
+  lgdoc-frontend:
+    build:
+      context: ./frontend
+      target: dev
+    ports:
+      - "5173:5173"                     # Vite dev server 直连
+    volumes:
+      - ./frontend/src:/app/src         # 热重载：挂载源码
+      - ./frontend/public:/app/public
+    command: pnpm dev --host 0.0.0.0
+
+  lgdoc-nginx:
+    # 开发环境不需要 nginx，frontend/backend 各自暴露端口
+    profiles: [prod-only]
+
+  lgdoc-mysql:
+    ports:
+      - "127.0.0.1:3306:3306"          # 开发时允许本地直连数据库
+
+  lgdoc-redis:
+    ports:
+      - "127.0.0.1:6379:6379"          # 开发时允许本地直连 Redis
+
+  lgdoc-minio:
+    ports:
+      - "127.0.0.1:9000:9000"          # MinIO API 端口，开发时本地可访问
+      - "127.0.0.1:9001:9001"
