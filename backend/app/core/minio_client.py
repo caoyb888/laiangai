@@ -1,10 +1,7 @@
-"""
-MinIO 客户端，完整实现见任务 5（文档管理模块）。
-此文件在任务 3 阶段作为占位，提供 init_minio / get_minio / get_presigned_url 接口。
-"""
 from datetime import timedelta
 import structlog
 from minio import Minio
+from minio.error import S3Error
 from app.config import get_settings
 
 logger = structlog.get_logger()
