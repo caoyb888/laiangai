@@ -22,16 +22,20 @@ const diffPanelRef = ref<InstanceType<typeof DiffPanel> | null>(null)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 async function loadTask() {
-  const res = await request.get(`/compare/tasks/${taskId}`)
-  task.value = res.data
-  if (res.data.status === 'done') {
-    await loadDiffs()
-    stopPolling()
-    loading.value = false
-  } else if (res.data.status === 'failed') {
-    failed.value = true
-    stopPolling()
-    loading.value = false
+  try {
+    const res = await request.get(`/compare/tasks/${taskId}`)
+    task.value = res.data
+    if (res.data.status === 'done') {
+      await loadDiffs()
+      stopPolling()
+      loading.value = false
+    } else if (res.data.status === 'failed') {
+      failed.value = true
+      stopPolling()
+      loading.value = false
+    }
+  } catch {
+    // 轮询期间的偶发网络/服务端错误静默忽略，下次轮询自动重试
   }
 }
 

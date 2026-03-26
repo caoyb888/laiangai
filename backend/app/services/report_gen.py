@@ -102,9 +102,10 @@ class ReportGenerator:
 
         # 注册中文字体：按优先级查找可用字体
         _font_candidates = [
-            ("/host-fonts/NotoSansCJK-Regular.ttc", "NotoSansCJK"),
-            ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", "NotoSansCJK"),
+            ("/host-fonts/wqy-zenhei.ttc", "WQYZenHei"),
+            ("/host-fonts/wqy-microhei.ttc", "WQYMicroHei"),
             ("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc", "WQYZenHei"),
+            ("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", "WQYMicroHei"),
             (os.path.join(self.TEMPLATE_DIR, "fonts", "SimSun.ttf"), "SimSun"),
         ]
         base_font = "Helvetica"
@@ -120,12 +121,16 @@ class ReportGenerator:
                     logger.warning("PDF 字体加载失败，尝试下一个", font=_fname, error=str(_e))
 
         styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "TitleCN", parent=styles["Title"],
+            fontName=base_font, fontSize=18, leading=26
+        )
         normal_style = ParagraphStyle(
             "NormalCN", parent=styles["Normal"],
             fontName=base_font, fontSize=10, leading=16
         )
         story = []
-        story.append(Paragraph("莱钢集团 文档比对报告", styles["Title"]))
+        story.append(Paragraph("莱钢集团 文档比对报告", title_style))
         story.append(Spacer(1, 20))
 
         # 摘要表格

@@ -34,15 +34,28 @@ class VectorizerService:
     def get_model(cls) -> object:
         if cls._model is None:
             import os
+            import torch
             from FlagEmbedding import BGEM3FlagModel  # 懒加载，避免测试时 import 失败
+
+            # PyTorch 2.6 将 weights_only 默认改为 True，旧格式 .bin 文件不兼容
+            # FlagEmbedding 内部调用 torch.load 时需要 weights_only=False
+            _orig_load = torch.load
+            def _patched_load(*args, **kwargs):  # noqa: ANN
+                kwargs.setdefault("weights_only", False)
+                return _orig_load(*args, **kwargs)
+            torch.load = _patched_load
+
             model_path = os.getenv("BGE_M3_MODEL_PATH", "BAAI/bge-m3")
             logger.info("加载 BGE-M3 模型", path=model_path)
-            cls._model = BGEM3FlagModel(
-                model_path,
-                use_fp16=False,       # CPU 模式不用 fp16
-                device="cpu",
-            )
-            logger.info("BGE-M3 模型加载完成")
+            try:
+                cls._model = BGEM3FlagModel(
+                    model_path,
+                    use_fp16=False,       # CPU 模式不用 fp16
+                    device="cpu",
+                )
+                logger.info("BGE-M3 模型加载完成")
+            finally:
+                torch.load = _orig_load   # 还原，避免影响其他模块
         return cls._model
 
     def encode(self, texts: list[str]) -> list[list[float]]:
