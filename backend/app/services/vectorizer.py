@@ -18,6 +18,14 @@ from pymilvus import (
 from app.config import get_settings
 from app.services.parser.base import ParsedDocument
 
+
+def _trunc_bytes(s: str, max_bytes: int) -> str:
+    """按 UTF-8 字节数截断字符串（Milvus VARCHAR max_length 按字节计算）"""
+    encoded = s.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return s
+    return encoded[:max_bytes].decode("utf-8", errors="ignore")
+
 logger = structlog.get_logger()
 settings = get_settings()
 
@@ -138,12 +146,12 @@ async def vectorize_document(doc_id: str, parsed: ParsedDocument) -> list[str]:
     vector_ids = [str(uuid.uuid4()) for _ in texts]
 
     data = [
-        vector_ids,                                  # id
-        [doc_id] * len(texts),                       # doc_id
-        [m["block_index"] for m in metas],           # block_index
-        [m["section_path"][:200] for m in metas],    # section_path
-        [t[:500] for t in texts],                    # chunk_text（前500字）
-        vectors,                                     # embedding
+        vector_ids,                                          # id
+        [doc_id] * len(texts),                               # doc_id
+        [m["block_index"] for m in metas],                   # block_index
+        [_trunc_bytes(m["section_path"], 200) for m in metas],  # section_path
+        [_trunc_bytes(t, 500) for t in texts],               # chunk_text
+        vectors,                                             # embedding
     ]
     collection.insert(data)
     collection.flush()

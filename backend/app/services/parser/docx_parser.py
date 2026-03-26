@@ -1,5 +1,6 @@
 import io
 import re
+import zipfile
 from docx import Document as DocxDocument
 from docx.text.paragraph import Paragraph as DocxParagraph
 from docx.table import Table as DocxTable
@@ -25,10 +26,12 @@ class DocxParser(BaseParser):
         try:
             doc = DocxDocument(io.BytesIO(content))
         except Exception as e:
-            logger.error("Word 文档打开失败", file_name=file_name, error=str(e))
-            raise ValueError(f"无法解析 Word 文档: {e}")
+            logger.warning("python-docx 直接打开失败，尝试修复 Content_Types 后重试",
+                           file_name=file_name, error=str(e))
+            doc = self._open_with_content_type_fix(content, file_name)
 
         blocks: list[TextBlock | TableBlock] = []
+
         index = 0
         section_stack: list[str] = []   # 维护章节路径
 
@@ -100,3 +103,40 @@ class DocxParser(BaseParser):
                     word_count=word_count)
 
         return ParsedDocument(meta=meta, blocks=blocks, raw_text=raw_text)
+
+    def _open_with_content_type_fix(self, content: bytes, file_name: str) -> DocxDocument:
+        """
+        修复 [Content_Types].xml 后重新尝试打开。
+        某些 docx（如部分 WPS 生成或模板另存的文件）会把 themeManager 等非正文
+        part 注册为 Override，导致 python-docx 找不到正文 part。
+        通过重写 Content_Types.xml，确保正文 part 被正确声明。
+        """
+        DOCUMENT_CT = (
+            "application/vnd.openxmlformats-officedocument"
+            ".wordprocessingml.document.main+xml"
+        )
+        try:
+            buf_in = io.BytesIO(content)
+            buf_out = io.BytesIO()
+            with zipfile.ZipFile(buf_in, "r") as zin, \
+                 zipfile.ZipFile(buf_out, "w", zipfile.ZIP_DEFLATED) as zout:
+                for item in zin.infolist():
+                    data = zin.read(item.filename)
+                    if item.filename == "[Content_Types].xml":
+                        # 确保 word/document.xml 有正确的 Override 声明
+                        ct_text = data.decode("utf-8")
+                        if "word/document.xml" not in ct_text:
+                            override = (
+                                f'<Override PartName="/word/document.xml" '
+                                f'ContentType="{DOCUMENT_CT}"/>'
+                            )
+                            ct_text = ct_text.replace("</Types>", override + "</Types>")
+                            data = ct_text.encode("utf-8")
+                    zout.writestr(item, data)
+            buf_out.seek(0)
+            doc = DocxDocument(buf_out)
+            logger.info("Content_Types 修复成功", file_name=file_name)
+            return doc
+        except Exception as e2:
+            logger.error("Word 文档修复后仍无法打开", file_name=file_name, error=str(e2))
+            raise ValueError(f"无法解析 Word 文档: {e2}")
