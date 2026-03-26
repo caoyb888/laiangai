@@ -45,7 +45,7 @@ async def dispatch_parse(doc_id: str, content: bytes, file_type: FileType, file_
                 ),
             )
 
-            # 更新文档元数据
+            # 更新文档元数据，解析状态设为 DONE（与向量化解耦）
             await repo.update_meta(
                 doc_id,
                 title=parsed.meta.title,
