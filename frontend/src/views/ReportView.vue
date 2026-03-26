@@ -5,29 +5,11 @@ import { ElMessage } from 'element-plus'
 import { View, Download, SwitchButton } from '@element-plus/icons-vue'
 import request from '@/api/request'
 import { useAuthStore } from '@/stores/auth'
+import { useLlmMode } from '@/composables/useLlmMode'
 import type { CompareTask } from '@/types/compare'
 
 // ── LLM 模式切换 ──────────────────────────────────────────
-const llmMock = ref(false)
-const llmModeLoading = ref(false)
-
-async function fetchLlmMode() {
-  const res = await request.get('/settings/llm-mode')
-  llmMock.value = res.data.mock
-}
-
-async function toggleLlmMode() {
-  llmModeLoading.value = true
-  try {
-    const res = await request.post('/settings/llm-mode', null, {
-      params: { mock: !llmMock.value },
-    })
-    llmMock.value = res.data.mock
-    ElMessage.success(`已切换到 ${llmMock.value ? 'Mock 模式' : '真实 LLM 模式'}`)
-  } finally {
-    llmModeLoading.value = false
-  }
-}
+const { llmMock, loading: llmModeLoading, fetchLlmMode, toggleLlmMode } = useLlmMode()
 
 const router = useRouter()
 const auth = useAuthStore()

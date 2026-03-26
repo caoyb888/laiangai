@@ -5,10 +5,12 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled, Delete, DocumentCopy, SwitchButton } from '@element-plus/icons-vue'
 import request from '@/api/request'
 import { useAuthStore } from '@/stores/auth'
+import { useLlmMode } from '@/composables/useLlmMode'
 import DocumentUploader from '@/components/common/DocumentUploader.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
+const { llmMock, loading: llmModeLoading, fetchLlmMode, toggleLlmMode } = useLlmMode()
 
 // ── 文档列表 ────────────────────────────────────────────
 interface DocItem {
@@ -135,7 +137,10 @@ function handleLogout() {
   router.push('/login')
 }
 
-onMounted(fetchDocs)
+onMounted(() => {
+  fetchDocs()
+  fetchLlmMode()
+})
 </script>
 
 <template>
@@ -148,6 +153,16 @@ onMounted(fetchDocs)
         <el-button text @click="router.push('/reports')">报告列表</el-button>
       </nav>
       <div class="nav-right">
+        <el-tooltip :content="llmMock ? '当前：Mock 模式（点击切换为真实 LLM）' : '当前：真实 LLM 模式（点击切换为 Mock）'" placement="bottom">
+          <el-button
+            :type="llmMock ? 'warning' : 'success'"
+            :loading="llmModeLoading"
+            size="small"
+            @click="toggleLlmMode"
+          >
+            {{ llmMock ? 'Mock 模式' : '真实 LLM' }}
+          </el-button>
+        </el-tooltip>
         <span class="username">{{ auth.displayName }}</span>
         <el-button text :icon="SwitchButton" @click="handleLogout">退出</el-button>
       </div>
