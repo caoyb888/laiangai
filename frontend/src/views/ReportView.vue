@@ -7,6 +7,28 @@ import request from '@/api/request'
 import { useAuthStore } from '@/stores/auth'
 import type { CompareTask } from '@/types/compare'
 
+// ── LLM 模式切换 ──────────────────────────────────────────
+const llmMock = ref(false)
+const llmModeLoading = ref(false)
+
+async function fetchLlmMode() {
+  const res = await request.get('/settings/llm-mode')
+  llmMock.value = res.data.mock
+}
+
+async function toggleLlmMode() {
+  llmModeLoading.value = true
+  try {
+    const res = await request.post('/settings/llm-mode', null, {
+      params: { mock: !llmMock.value },
+    })
+    llmMock.value = res.data.mock
+    ElMessage.success(`已切换到 ${llmMock.value ? 'Mock 模式' : '真实 LLM 模式'}`)
+  } finally {
+    llmModeLoading.value = false
+  }
+}
+
 const router = useRouter()
 const auth = useAuthStore()
 
@@ -75,7 +97,10 @@ function handleLogout() {
   router.push('/login')
 }
 
-onMounted(fetchTasks)
+onMounted(() => {
+  fetchTasks()
+  fetchLlmMode()
+})
 </script>
 
 <template>
@@ -96,7 +121,19 @@ onMounted(fetchTasks)
     <main class="main-content">
       <div class="page-header">
         <span class="page-title">比对报告历史</span>
-        <el-button @click="router.push('/documents')">返回文档管理</el-button>
+        <div class="page-header-actions">
+          <el-tooltip :content="llmMock ? '当前：Mock 模式（点击切换为真实 LLM）' : '当前：真实 LLM 模式（点击切换为 Mock）'" placement="bottom">
+            <el-button
+              :type="llmMock ? 'warning' : 'success'"
+              :loading="llmModeLoading"
+              size="small"
+              @click="toggleLlmMode"
+            >
+              {{ llmMock ? 'Mock 模式' : '真实 LLM' }}
+            </el-button>
+          </el-tooltip>
+          <el-button @click="router.push('/documents')">返回文档管理</el-button>
+        </div>
       </div>
 
       <!-- 任务表格 -->
@@ -253,6 +290,12 @@ onMounted(fetchTasks)
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .page-title {

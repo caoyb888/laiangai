@@ -15,6 +15,20 @@ import structlog
 logger = structlog.get_logger()
 settings = get_settings()
 
+# 运行时覆盖（None 表示跟随 settings.llm_api_mock）
+_runtime_mock: bool | None = None
+
+
+def get_llm_mock_mode() -> bool:
+    if _runtime_mock is not None:
+        return _runtime_mock
+    return settings.llm_api_mock
+
+
+def set_llm_mock_mode(value: bool) -> None:
+    global _runtime_mock
+    _runtime_mock = value
+
 
 # ── Prompt 模板（全部从文件加载，禁止在业务代码硬编码）───────────────────────
 def _load_prompt(name: str) -> str:
@@ -89,7 +103,7 @@ class LLMClient:
         error_code = None
 
         try:
-            if settings.llm_api_mock:
+            if get_llm_mock_mode():
                 return cls._mock_response(text)
 
             if provider == "qianwen":
