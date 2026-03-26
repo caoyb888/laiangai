@@ -61,27 +61,34 @@ async def run_compare_pipeline(task_id: str, user_id: str) -> None:
             await repo.update_task_status(task_id, TaskStatus.PROCESSING, progress=40)
             await db.commit()
 
-            # ─── Step 3: LLM 语义分析（字符级所有 modify 差异全量送入）──────
+            # ─── Step 3: LLM 语义分析（逐条处理，实时更新进度）──────────────
             # 向量过滤已移除（见文件头注释）
             # 见 CLAUDE.md §七：禁止对全文发送 LLM 分析（此处仅发送字符级差异块）
             real_diffs = changed_pairs
             desensitizer = get_desensitizer()
             risk_detector = RiskDetector()
 
-            llm_chunks: list[DesensitizedChunk] = []
-            for pair in real_diffs:
+            total_diffs_count = len(real_diffs)
+            llm_results: list[dict] = []
+            # LLM 阶段占进度 40→85，逐条处理并每 5 条提交一次进度
+            for idx, pair in enumerate(real_diffs):
                 combined = "\n---\n".join(filter(None, [
                     f"原文：{pair.get('doc_a_text', '')}",
                     f"修改后：{pair.get('doc_b_text', '')}",
                 ]))
-                llm_chunks.append(desensitizer.desensitize(combined))
+                chunk = desensitizer.desensitize(combined)
+                results = await LLMClient.analyze_diff(
+                    [chunk], task_id=task_id, user_id=user_id
+                )
+                llm_results.append(results[0] if results else {})
 
-            llm_results = await LLMClient.analyze_diff(
-                llm_chunks, task_id=task_id, user_id=user_id
-            )
-
-            await repo.update_task_status(task_id, TaskStatus.PROCESSING, progress=85)
-            await db.commit()
+                # 每 5 条或最后一条提交一次进度
+                if (idx + 1) % 5 == 0 or (idx + 1) == total_diffs_count:
+                    pct = 40 + int((idx + 1) / max(total_diffs_count, 1) * 45)
+                    await repo.update_task_status(
+                        task_id, TaskStatus.PROCESSING, progress=pct
+                    )
+                    await db.commit()
 
             # ─── Step 5: 风险识别 & 写入数据库 ─────────────────────────────
             diff_items_to_save = []
