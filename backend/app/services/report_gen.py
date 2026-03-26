@@ -5,6 +5,7 @@
 import io
 import os
 from datetime import datetime
+from xml.sax.saxutils import escape as _xml_escape
 
 from docx import Document as DocxDocument
 from docx.shared import Pt, RGBColor
@@ -123,32 +124,114 @@ class ReportGenerator:
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
             "TitleCN", parent=styles["Title"],
-            fontName=base_font, fontSize=18, leading=26
+            fontName=base_font, fontSize=18, leading=26, spaceAfter=6
+        )
+        h1_style = ParagraphStyle(
+            "H1CN", parent=styles["Heading1"],
+            fontName=base_font, fontSize=14, leading=20, spaceBefore=16, spaceAfter=8
         )
         normal_style = ParagraphStyle(
             "NormalCN", parent=styles["Normal"],
             fontName=base_font, fontSize=10, leading=16
         )
-        story = []
-        story.append(Paragraph("莱钢集团 文档比对报告", title_style))
-        story.append(Spacer(1, 20))
+        bold_style = ParagraphStyle(
+            "BoldCN", parent=styles["Normal"],
+            fontName=base_font, fontSize=10, leading=16, fontWeight="bold"
+        )
+        label_style = ParagraphStyle(
+            "LabelCN", parent=styles["Normal"],
+            fontName=base_font, fontSize=9, leading=14, textColor=colors.HexColor("#555555")
+        )
 
-        # 摘要表格
+        # 差异等级颜色
+        _level_colors = {
+            "CRITICAL": colors.HexColor("#D32F2F"),
+            "MAJOR":    colors.HexColor("#F57C00"),
+            "MINOR":    colors.HexColor("#388E3C"),
+        }
+
+        story = []
+
+        # ── 封面 ──────────────────────────────────────────────────────────
+        story.append(Spacer(1, 40))
+        story.append(Paragraph("莱钢集团 文档比对报告", title_style))
+        story.append(Spacer(1, 16))
+        meta_data = [
+            ["任务名称", report_data.get("task_name", "未命名")],
+            ["文档A（基准）", report_data.get("doc_a_name", "")],
+            ["文档B（对比）", report_data.get("doc_b_name", "")],
+            ["生成时间", datetime.now().strftime("%Y-%m-%d %H:%M")],
+        ]
+        meta_table = Table(meta_data, colWidths=[100, 340])
+        meta_table.setStyle(TableStyle([
+            ("FONTNAME", (0, 0), (-1, -1), base_font),
+            ("FONTSIZE", (0, 0), (-1, -1), 10),
+            ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#555555")),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(meta_table)
+        story.append(Spacer(1, 24))
+
+        # ── 比对摘要 ──────────────────────────────────────────────────────
+        story.append(Paragraph("一、比对摘要", h1_style))
         summary = report_data.get("summary", {})
         table_data = [
             ["项目", "数值"],
             ["总差异数", str(summary.get("total_diffs", 0))],
-            ["重大差异", str(summary.get("critical_diffs", 0))],
-            ["一般差异", str(summary.get("major_diffs", 0))],
+            ["重大差异（CRITICAL）", str(summary.get("critical_diffs", 0))],
+            ["一般差异（MAJOR）", str(summary.get("major_diffs", 0))],
+            ["格式差异（MINOR）", str(summary.get("minor_diffs", 0))],
         ]
-        t = Table(table_data, colWidths=[200, 100])
+        t = Table(table_data, colWidths=[300, 140])
         t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#455A64")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
             ("FONTNAME", (0, 0), (-1, -1), base_font),
+            ("FONTSIZE", (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F5F5F5")]),
         ]))
         story.append(t)
+        story.append(Spacer(1, 24))
+
+        # ── 差异详情 ──────────────────────────────────────────────────────
+        story.append(Paragraph("二、差异详情", h1_style))
+
+        from reportlab.platypus import HRFlowable
+        for item in report_data.get("diff_items", []):
+            level = item.get("diff_level", "MINOR")
+            level_color = _level_colors.get(level, colors.black)
+            seq = item.get("seq_no", 0) + 1
+
+            # 差异标题行
+            level_labels = {"CRITICAL": "重大差异", "MAJOR": "一般差异", "MINOR": "格式差异"}
+            header_style = ParagraphStyle(
+                f"DiffHeader{seq}", parent=styles["Normal"],
+                fontName=base_font, fontSize=10, leading=16,
+                textColor=level_color, spaceBefore=10
+            )
+            story.append(Paragraph(
+                f"【{level_labels.get(level, level)}】差异 #{seq}",
+                header_style
+            ))
+
+            if item.get("doc_a_text"):
+                story.append(Paragraph("原文：", label_style))
+                story.append(Paragraph(_xml_escape(item["doc_a_text"][:500]), normal_style))
+            if item.get("doc_b_text"):
+                story.append(Paragraph("修改后：", label_style))
+                story.append(Paragraph(_xml_escape(item["doc_b_text"][:500]), normal_style))
+            if item.get("semantic_desc"):
+                story.append(Paragraph("分析：", label_style))
+                story.append(Paragraph(_xml_escape(item["semantic_desc"]), normal_style))
+            if item.get("risk_keywords"):
+                story.append(Paragraph(f"风险关键词：{_xml_escape(item['risk_keywords'])}", label_style))
+
+            story.append(HRFlowable(width="100%", thickness=0.5,
+                                    color=colors.HexColor("#DDDDDD"), spaceAfter=4))
 
         doc.build(story)
         return buf.getvalue()

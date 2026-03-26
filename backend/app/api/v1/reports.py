@@ -10,6 +10,7 @@ from app.core.db import get_db
 from app.core.minio_client import get_minio
 from app.core.security import get_current_user
 from app.repositories.compare_repo import CompareRepository
+from app.repositories.document_repo import DocumentRepository
 from app.schemas.response import ApiResponse, ErrorCode
 from app.services.report_gen import ReportGenerator
 
@@ -36,6 +37,10 @@ async def export_report(
     if not task:
         return ApiResponse.error(ErrorCode.TASK_NOT_FOUND, "任务不存在")
 
+    doc_repo = DocumentRepository(db)
+    doc_a = await doc_repo.get_by_id(task.doc_a_id)
+    doc_b = await doc_repo.get_by_id(task.doc_b_id)
+
     items, _ = await repo.list_diffs(task_id, page=1, page_size=9999)
     summary = {
         "total_diffs": task.total_diffs or 0,
@@ -45,6 +50,8 @@ async def export_report(
     }
     report_data = {
         "task_name": task.task_name or task_id,
+        "doc_a_name": doc_a.file_name if doc_a else task.doc_a_id,
+        "doc_b_name": doc_b.file_name if doc_b else task.doc_b_id,
         "summary": summary,
         "diff_items": [
             {
