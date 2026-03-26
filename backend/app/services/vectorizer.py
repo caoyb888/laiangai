@@ -41,7 +41,9 @@ class VectorizerService:
             # FlagEmbedding 内部调用 torch.load 时需要 weights_only=False
             _orig_load = torch.load
             def _patched_load(*args, **kwargs):  # noqa: ANN
-                kwargs.setdefault("weights_only", False)
+                # FlagEmbedding 内部显式传 weights_only=True，setdefault 无法覆盖
+                # 旧格式 .pt 权重文件需要 weights_only=False 才能加载
+                kwargs["weights_only"] = False
                 return _orig_load(*args, **kwargs)
             torch.load = _patched_load
 

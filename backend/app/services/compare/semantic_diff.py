@@ -1,7 +1,10 @@
 """
-语义级比对：BGE-M3 向量余弦相似度
-仅对字符级比对已标记的差异块进行语义二次判断
-见 CLAUDE.md §七 比对算法规范，阈值 0.92
+语义向量工具：BGE-M3
+- analyze_diff_pairs：计算余弦相似度（已从主流水线移除，保留供调试/离线分析使用）
+  原因：BGE-M3 对同类条款相似度普遍 > 0.94，无法用阈值区分关键数字变更，
+        改为全量 modify 差异送 LLM 判断。
+- search_similar_paragraphs：段落移位检测（向量检索），规划用于 move 类型差异识别
+见 CLAUDE.md §七 比对算法规范
 """
 import numpy as np
 import structlog

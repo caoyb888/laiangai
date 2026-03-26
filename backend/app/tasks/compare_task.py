@@ -1,6 +1,11 @@
 """
 比对任务主流水线
-三层比对顺序：字符级 → 语义级（向量） → LLM 语义分析 → 风险识别
+流程：字符级比对 → LLM 语义分析（全量 modify 差异） → 风险识别
+注：向量相似度过滤（SemanticDiffEngine.analyze_diff_pairs）已移除。
+    实测 BGE-M3 对同类条款余弦相似度普遍 > 0.94，金额/违约金等关键数字
+    变更无法被阈值区分，会造成漏判。当前策略：字符级标记的所有 modify
+    差异直接送 LLM，由模型判断实质性。
+    SemanticDiffEngine.search_similar_paragraphs 保留用于段落移位检测（规划中）。
 见 CLAUDE.md §七 比对核心算法规范
 """
 import json
@@ -10,7 +15,6 @@ from app.core.db import AsyncSessionLocal
 from app.repositories.compare_repo import CompareRepository
 from app.repositories.document_repo import DocumentRepository
 from app.services.compare.char_diff import CharDiffEngine
-from app.services.compare.semantic_diff import SemanticDiffEngine
 from app.services.compare.risk_detector import RiskDetector
 from app.services.desensitizer import get_desensitizer, DesensitizedChunk
 from app.services.llm_client import LLMClient
@@ -52,21 +56,12 @@ async def run_compare_pipeline(task_id: str, user_id: str) -> None:
             # 过滤掉完全相同的段落
             changed_pairs = [p for p in diff_pairs if p.get("diff_type") != "equal"]
 
-            await repo.update_task_status(task_id, TaskStatus.PROCESSING, progress=35)
+            await repo.update_task_status(task_id, TaskStatus.PROCESSING, progress=40)
 
-            # ─── Step 3: 语义级比对（向量） ────────────────────────────────
-            semantic_engine = SemanticDiffEngine()
-            changed_pairs = semantic_engine.analyze_diff_pairs(changed_pairs)
-            # 过滤语义等价的差异（格式变动）
-            real_diffs = [
-                p for p in changed_pairs
-                if not p.get("semantic_is_equivalent", False)
-            ]
-
-            await repo.update_task_status(task_id, TaskStatus.PROCESSING, progress=55)
-
-            # ─── Step 4: LLM 语义分析（仅对已标记差异块）───────────────────
-            # 见 CLAUDE.md §七：禁止对全文发送 LLM 分析
+            # ─── Step 3: LLM 语义分析（字符级所有 modify 差异全量送入）──────
+            # 向量过滤已移除（见文件头注释）
+            # 见 CLAUDE.md §七：禁止对全文发送 LLM 分析（此处仅发送字符级差异块）
+            real_diffs = changed_pairs
             desensitizer = get_desensitizer()
             risk_detector = RiskDetector()
 
@@ -82,7 +77,7 @@ async def run_compare_pipeline(task_id: str, user_id: str) -> None:
                 llm_chunks, task_id=task_id, user_id=user_id
             )
 
-            await repo.update_task_status(task_id, TaskStatus.PROCESSING, progress=80)
+            await repo.update_task_status(task_id, TaskStatus.PROCESSING, progress=85)
 
             # ─── Step 5: 风险识别 & 写入数据库 ─────────────────────────────
             diff_items_to_save = []
