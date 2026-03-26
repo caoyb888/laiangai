@@ -7,7 +7,8 @@ from app.config import get_settings
 from app.core.db import init_db
 from app.core.minio_client import init_minio
 from app.core.milvus_client import init_milvus
-from app.api.v1 import auth, documents, compare, reports, settings
+from app.api.v1 import auth, documents, compare, reports
+from app.api.v1 import settings as settings_router
 
 logger = structlog.get_logger()
 settings = get_settings()
@@ -47,4 +48,4 @@ app.include_router(auth.router,      prefix="/api/v1/auth",      tags=["认证"]
 app.include_router(documents.router, prefix="/api/v1/documents",  tags=["文档管理"])
 app.include_router(compare.router,   prefix="/api/v1/compare",    tags=["比对任务"])
 app.include_router(reports.router,   prefix="/api/v1/reports",    tags=["报告导出"])
-app.include_router(settings.router,  prefix="/api/v1/settings",   tags=["运行时配置"])
+app.include_router(settings_router.router, prefix="/api/v1/settings", tags=["运行时配置"])
