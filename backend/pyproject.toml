@@ -37,7 +37,8 @@ dependencies = [
 
     # 向量模型（CPU 推理）
     "numpy>=1.24,<2.0",           # NumPy 2.0+ 要求 x86-64-v2 CPU 指令集，宿主机不支持
-    "FlagEmbedding>=1.2.0",
+    "FlagEmbedding>=1.2.0,<2.0",
+    "transformers>=4.36.0,<5.0",
     "torch>=2.2.0",
 
     # 比对算法

@@ -100,13 +100,24 @@ class ReportGenerator:
             leftMargin=72, rightMargin=72, topMargin=72, bottomMargin=72
         )
 
-        # 注册中文字体（需提前放置字体文件）
-        font_path = os.path.join(self.TEMPLATE_DIR, "fonts", "SimSun.ttf")
-        if os.path.exists(font_path):
-            pdfmetrics.registerFont(TTFont("SimSun", font_path))
-            base_font = "SimSun"
-        else:
-            base_font = "Helvetica"  # 退化到英文字体
+        # 注册中文字体：按优先级查找可用字体
+        _font_candidates = [
+            ("/host-fonts/NotoSansCJK-Regular.ttc", "NotoSansCJK"),
+            ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", "NotoSansCJK"),
+            ("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc", "WQYZenHei"),
+            (os.path.join(self.TEMPLATE_DIR, "fonts", "SimSun.ttf"), "SimSun"),
+        ]
+        base_font = "Helvetica"
+        for _fpath, _fname in _font_candidates:
+            if os.path.exists(_fpath):
+                try:
+                    from reportlab.pdfbase.ttfonts import TTFont as _TTFont
+                    pdfmetrics.registerFont(_TTFont(_fname, _fpath, subfontIndex=0))
+                    base_font = _fname
+                    logger.info("PDF 字体加载成功", font=_fname, path=_fpath)
+                    break
+                except Exception as _e:
+                    logger.warning("PDF 字体加载失败，尝试下一个", font=_fname, error=str(_e))
 
         styles = getSampleStyleSheet()
         normal_style = ParagraphStyle(

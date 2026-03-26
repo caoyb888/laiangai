@@ -99,7 +99,7 @@ async function startCompare() {
   }
   comparing.value = true
   try {
-    const res = await request.post('/compare/', {
+    const res = await request.post('/compare/tasks', {
       doc_a_id: selected.value[0].document_id,
       doc_b_id: selected.value[1].document_id,
       task_name: `${selected.value[0].file_name} vs ${selected.value[1].file_name}`,

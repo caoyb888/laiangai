@@ -34,7 +34,6 @@ function openFilePicker() {
 function onFileChange(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
-  console.log('[Uploader] onFileChange triggered, file:', file?.name)
   // 清空 input，允许重复选同一文件（在取出 file 后再清空）
   input.value = ''
   if (file) doUpload(file)
@@ -57,7 +56,6 @@ function onDrop(e: DragEvent) {
 }
 
 async function doUpload(file: File) {
-  console.log('[Uploader] doUpload called, file:', file.name, file.type, file.size)
   // 类型校验：先用 MIME，再用扩展名兜底
   const ext = '.' + file.name.split('.').pop()?.toLowerCase()
   if (!ALLOWED_TYPES.includes(file.type) && !ALLOWED_EXT.includes(ext)) {
@@ -77,22 +75,19 @@ async function doUpload(file: File) {
   formData.append('category', props.category || 'other')
 
   try {
-    console.log('[Uploader] sending request...')
     const res = await request.post('/documents/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (e) => {
         uploadProgress.value = Math.round((e.loaded * 90) / (e.total || 1))
-        console.log('[Uploader] progress:', uploadProgress.value)
       },
     })
-    console.log('[Uploader] response:', res.data)
     uploadProgress.value = 100
     ElMessage.success('上传成功，正在解析中...')
     emit('uploaded', res.data.document_id, res.data.file_name)
   } catch (err: unknown) {
     uploadProgress.value = 0
-    console.error('[Uploader] error:', err)
-    ElMessage.error('上传失败：' + (err instanceof Error ? err.message : '请重试'))
+    const msg = err instanceof Error ? err.message : '请重试'
+    ElMessage({ type: 'error', message: msg, duration: 5000, showClose: true })
   } finally {
     uploading.value = false
   }

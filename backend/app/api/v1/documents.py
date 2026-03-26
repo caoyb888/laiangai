@@ -93,10 +93,10 @@ async def upload_document(
     # 3. MD5 去重
     md5 = hashlib.md5(content).hexdigest()
     repo = DocumentRepository(db)
-    existing = await repo.get_by_checksum(md5, current_user["user_id"])
+    existing = await repo.get_by_checksum(md5, current_user["user_id"], file.filename)
     if existing:
         return ApiResponse.error(ErrorCode.DUPLICATE_FILE,
-                                 f"文件已存在，文档ID: {existing.id}")
+                                 f"文件「{existing.file_name}」已存在，请勿重复上传")
 
     # 4. 上传至 MinIO（见 CLAUDE.md §4.4，禁止存储在容器本地文件系统）
     doc_id = str(uuid.uuid4())
@@ -120,8 +120,11 @@ async def upload_document(
         category=category,
     )
 
-    # 6. 后台异步解析（dispatch_parse 由任务6/7实现）
-    background_tasks.add_task(dispatch_parse, doc_id, content, doc.file_type)
+    # 6. 提前 commit，确保前端刷新列表时能立即查到新记录
+    await db.commit()
+
+    # 7. 后台异步解析（dispatch_parse 由任务6/7实现）
+    background_tasks.add_task(dispatch_parse, doc_id, content, doc.file_type, file.filename)
 
     await log_operation(db, current_user["user_id"], "UPLOAD_DOC",
                         "document", doc_id, {"file_name": file.filename})
@@ -161,3 +164,22 @@ async def get_document(
         "created_at": doc.created_at.isoformat(),
         "download_url": download_url,  # 有时效，前端不得缓存
     })
+
+
+@router.delete("/{doc_id}", response_model=ApiResponse[dict])
+async def delete_document(
+    doc_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[dict]:
+    repo = DocumentRepository(db)
+    doc = await repo.get_by_id(doc_id)
+    if not doc or doc.is_deleted:
+        return ApiResponse.error(ErrorCode.DOCUMENT_NOT_FOUND, "文档不存在")
+    if doc.uploader_id != current_user["user_id"] and current_user.get("role") != "admin":
+        return ApiResponse.error(ErrorCode.FORBIDDEN, "无权删除此文档")
+
+    doc.is_deleted = True
+    await log_operation(db, current_user["user_id"], "DELETE_DOC",
+                        "document", doc_id, {"file_name": doc.file_name})
+    return ApiResponse.ok(data={"document_id": doc_id}, message="删除成功")

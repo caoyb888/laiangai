@@ -53,8 +53,12 @@ class SemanticDiffEngine:
         # 批量向量化（减少模型调用次数）
         texts_a = [p["doc_a_text"] for p in pairs_to_analyze]
         texts_b = [p["doc_b_text"] for p in pairs_to_analyze]
-        vecs_a = self.vectorizer.encode(texts_a)
-        vecs_b = self.vectorizer.encode(texts_b)
+        try:
+            vecs_a = self.vectorizer.encode(texts_a)
+            vecs_b = self.vectorizer.encode(texts_b)
+        except Exception as e:
+            logger.warning("BGE-M3 向量化失败，跳过语义去重，保留所有字符级差异", error=str(e))
+            return diff_pairs
 
         # 计算相似度并回写
         pair_idx = 0

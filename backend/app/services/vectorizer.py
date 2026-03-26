@@ -33,10 +33,12 @@ class VectorizerService:
     @classmethod
     def get_model(cls) -> object:
         if cls._model is None:
+            import os
             from FlagEmbedding import BGEM3FlagModel  # 懒加载，避免测试时 import 失败
-            logger.info("加载 BGE-M3 模型（首次加载约20秒）")
+            model_path = os.getenv("BGE_M3_MODEL_PATH", "BAAI/bge-m3")
+            logger.info("加载 BGE-M3 模型", path=model_path)
             cls._model = BGEM3FlagModel(
-                "BAAI/bge-m3",
+                model_path,
                 use_fp16=False,       # CPU 模式不用 fp16
                 device="cpu",
             )
@@ -93,6 +95,12 @@ class VectorizerService:
                     "chunk_idx": chunk_idx,
                 }))
         return results
+
+
+def vectorize_document_sync(doc_id: str, parsed: ParsedDocument) -> list[str]:
+    """同步版向量化，供 asyncio.to_thread 调用，避免阻塞事件循环"""
+    import asyncio
+    return asyncio.run(vectorize_document(doc_id, parsed))
 
 
 async def vectorize_document(doc_id: str, parsed: ParsedDocument) -> list[str]:

@@ -20,6 +20,10 @@ request.interceptors.request.use((config) => {
 // 响应拦截器：统一错误处理（见 CLAUDE.md §6.4）
 request.interceptors.response.use(
   (response: AxiosResponse) => {
+    // blob/arraybuffer 响应直接返回，不走业务码判断
+    if (response.config.responseType === 'blob' || response.config.responseType === 'arraybuffer') {
+      return response
+    }
     const data = response.data
     if (data.code && data.code !== 200) {
       // 认证失效
@@ -28,14 +32,19 @@ request.interceptors.response.use(
         router.push('/login')
         return Promise.reject(new Error('登录已过期，请重新登录'))
       }
-      ElMessage.error(data.message || '操作失败')
-      return Promise.reject(new Error(data.message))
+      // 将 message 附在 Error 上，由各业务调用方决定如何展示
+      const err = new Error(data.message || '操作失败')
+      ;(err as Error & { bizCode: number }).bizCode = data.code
+      return Promise.reject(err)
     }
     return data
   },
   (error) => {
-    const msg = error.response?.data?.message || error.message || '网络异常'
-    ElMessage.error(msg)
+    // 网络层错误（非 2xx）才在这里统一弹，业务错误（2xx but code!=200）由调用方弹
+    if (error.response) {
+      const msg = error.response.data?.message || error.message || '网络异常'
+      ElMessage({ type: 'error', message: msg, duration: 5000, showClose: true })
+    }
     return Promise.reject(error)
   }
 )

@@ -64,12 +64,13 @@ async def create_compare_task(
         doc_b_id=req.doc_b_id,
         task_name=req.task_name,
     )
+    await log_operation(db, current_user["user_id"], "CREATE_TASK", "compare_task", task.id)
+    await db.commit()  # 必须在 background_tasks 前提交，否则后台任务查不到记录
     background_tasks.add_task(
         run_compare_pipeline,
         task.id,
         current_user["user_id"],
     )
-    await log_operation(db, current_user["user_id"], "CREATE_TASK", "compare_task", task.id)
     return ApiResponse.ok(data={"task_id": task.id, "status": "pending"}, message="比对任务已创建")
 
 
@@ -80,15 +81,22 @@ async def get_task_status(
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse[dict]:
     repo = CompareRepository(db)
+    doc_repo = DocumentRepository(db)
     task = await repo.get_task(task_id)
     if not task:
         return ApiResponse.error(ErrorCode.TASK_NOT_FOUND, "任务不存在")
+    doc_a = await doc_repo.get_by_id(task.doc_a_id)
+    doc_b = await doc_repo.get_by_id(task.doc_b_id)
     return ApiResponse.ok(data={
         "task_id": task.id,
+        "task_name": task.task_name,
         "status": task.status,
         "progress": task.progress,
         "total_diffs": task.total_diffs,
         "critical_diffs": task.critical_diffs,
+        "error_msg": task.error_msg,
+        "doc_a_name": doc_a.file_name if doc_a else task.doc_a_id,
+        "doc_b_name": doc_b.file_name if doc_b else task.doc_b_id,
         "created_at": task.created_at.isoformat(),
         "finished_at": task.finished_at.isoformat() if task.finished_at else None,
     })

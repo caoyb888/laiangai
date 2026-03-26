@@ -14,11 +14,12 @@ class DocumentRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_by_checksum(self, md5: str, uploader_id: str) -> Document | None:
-        """MD5 去重，仅在同一上传用户范围内检查"""
+    async def get_by_checksum(self, md5: str, uploader_id: str, file_name: str) -> Document | None:
+        """MD5 + 文件名双重去重：同内容同名才视为重复，允许同内容不同名（版本对比场景）"""
         result = await self.db.execute(
             select(Document).where(
                 Document.checksum_md5 == md5,
+                Document.file_name == file_name,
                 Document.uploader_id == uploader_id,
                 Document.is_deleted == False,
             )

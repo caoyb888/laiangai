@@ -14,7 +14,9 @@ const task = ref<CompareTask | null>(null)
 const diffItems = ref<DiffItem[]>([])
 const currentIndex = ref(0)
 const loading = ref(true)
+const failed = ref(false)
 const exporting = ref(false)
+const diffPanelRef = ref<InstanceType<typeof DiffPanel> | null>(null)
 
 // 轮询任务状态
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -27,7 +29,7 @@ async function loadTask() {
     stopPolling()
     loading.value = false
   } else if (res.data.status === 'failed') {
-    ElMessage.error('比对任务失败：' + (res.data.error_msg || '未知错误'))
+    failed.value = true
     stopPolling()
     loading.value = false
   }
@@ -50,14 +52,20 @@ function stopPolling() {
 async function exportReport(format: 'pdf' | 'docx') {
   exporting.value = true
   try {
+    // Step 1: 生成报告，获取下载路径
     const res = await request.post(`/reports/tasks/${taskId}/export`, null, {
       params: { format }
     })
-    // 自动触发下载
+    const downloadPath = res.data.download_url  // 形如 /api/v1/reports/download/{id}
+
+    // Step 2: 用 axios（带 token）以 blob 方式下载文件
+    const blobRes = await request.get(downloadPath, { responseType: 'blob' })
+    const url = URL.createObjectURL(blobRes.data)
     const a = document.createElement('a')
-    a.href = res.data.download_url
+    a.href = url
     a.download = `比对报告_${taskId}.${format}`
     a.click()
+    URL.revokeObjectURL(url)
     ElMessage.success('报告导出成功')
   } finally {
     exporting.value = false
@@ -108,8 +116,21 @@ onUnmounted(stopPolling)
       <p>正在比对中，请稍候...</p>
     </div>
 
+    <div v-else-if="failed" class="loading-state">
+      <el-result
+        icon="error"
+        title="比对任务失败"
+        :sub-title="task?.error_msg || '请重新发起比对'"
+      >
+        <template #extra>
+          <el-button type="primary" @click="$router.push('/documents')">返回文档管理</el-button>
+        </template>
+      </el-result>
+    </div>
+
     <div v-else class="compare-body">
       <DiffPanel
+        ref="diffPanelRef"
         :diff-items="diffItems"
         :doc-a-name="task?.doc_a_name || '文档A'"
         :doc-b-name="task?.doc_b_name || '文档B'"
@@ -117,7 +138,7 @@ onUnmounted(stopPolling)
       <DiffNavigator
         :items="diffItems"
         :current-index="currentIndex"
-        @jump-to="(i) => currentIndex = i"
+        @jump-to="(i) => { currentIndex = i; diffPanelRef?.jumpTo(i) }"
       />
     </div>
   </div>

@@ -1,4 +1,6 @@
+import asyncio
 import json
+import os
 from app.core.db import AsyncSessionLocal
 from app.repositories.document_repo import DocumentRepository
 from app.models.document import FileType, ParseStatus
@@ -19,7 +21,7 @@ _parsers: dict[FileType, DocxParser | PdfParser | TxtParser] = {
 }
 
 
-async def dispatch_parse(doc_id: str, content: bytes, file_type: FileType) -> None:
+async def dispatch_parse(doc_id: str, content: bytes, file_type: FileType, file_name: str = "") -> None:
     """
     后台任务：分发解析，更新解析状态
     """
@@ -32,8 +34,7 @@ async def dispatch_parse(doc_id: str, content: bytes, file_type: FileType) -> No
             if not parser:
                 raise ValueError(f"不支持的文件类型: {file_type}")
 
-            doc_record = await repo.get_by_id(doc_id)
-            parsed: ParsedDocument = await parser.parse(content, doc_record.file_name)
+            parsed: ParsedDocument = await parser.parse(content, file_name)
 
             # 持久化解析内容
             await repo.save_content(
@@ -53,12 +54,19 @@ async def dispatch_parse(doc_id: str, content: bytes, file_type: FileType) -> No
                 parse_status=ParseStatus.DONE,
             )
 
-            # 异步触发向量化（后台任务链，任务9实现）
-            from app.services.vectorizer import vectorize_document
-            await vectorize_document(doc_id, parsed)
-
             await db.commit()
             logger.info("文档解析完成", doc_id=doc_id, file_type=file_type)
+
+            # 向量化（VECTOR_ENABLED=false 时跳过）
+            if os.getenv("VECTOR_ENABLED", "false").lower() == "true":
+                try:
+                    from app.services.vectorizer import vectorize_document_sync
+                    # 在线程池中运行同步版本，避免阻塞事件循环
+                    await asyncio.to_thread(vectorize_document_sync, doc_id, parsed)
+                except Exception as vec_err:
+                    logger.warning("向量化失败，跳过", doc_id=doc_id, error=str(vec_err))
+            else:
+                logger.info("向量化已禁用（VECTOR_ENABLED=false）", doc_id=doc_id)
 
         except Exception as e:
             await repo.update_parse_status(doc_id, ParseStatus.FAILED, str(e))

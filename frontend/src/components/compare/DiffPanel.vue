@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
-import { RecycleScroller } from 'vue-virtual-scroller'
+import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
 import type { DiffItem } from '@/types/compare'
 
@@ -22,10 +22,9 @@ const filteredItems = computed(() => {
   return props.diffItems.filter(i => i.diff_level === filterLevel.value)
 })
 
-// 跳转到指定差异项
+// 跳转到指定差异项（供父组件通过 ref 调用）
 function jumpTo(index: number) {
   currentIndex.value = index
-  // 虚拟滚动滚动到对应位置
   nextTick(() => {
     const scroller = document.getElementById('diff-scroller')
     scroller?.scrollTo({ top: index * 120, behavior: 'smooth' })
@@ -96,61 +95,68 @@ defineExpose({ jumpTo })
     <!-- 双栏表头 -->
     <div class="diff-header">
       <div class="panel-label">📄 {{ docAName }}（基准）</div>
+      <div></div>
       <div class="panel-label">📄 {{ docBName }}（对比）</div>
     </div>
 
     <!-- 虚拟滚动列表（长文档性能保障，见 CLAUDE.md §6.2）-->
-    <RecycleScroller
+    <DynamicScroller
       id="diff-scroller"
       class="diff-scroller"
       :items="filteredItems"
-      :item-size="140"
+      :min-item-size="80"
       key-field="id"
     >
-      <template #default="{ item, index }">
-        <div
-          class="diff-row"
-          :class="[getDiffClass(asItem(item)), { 'is-active': index === currentIndex }]"
-          @click="currentIndex = index"
+      <template #default="{ item, index, active }">
+        <DynamicScrollerItem
+          :item="item"
+          :active="active"
+          :data-index="index"
         >
-          <!-- 左侧：文档A -->
-          <div class="diff-cell cell-a">
-            <div class="cell-meta">
-              <el-tag :type="getLevelTag(asItem(item).diff_level)" size="small">
-                {{ asItem(item).diff_level }}
-              </el-tag>
-              <span class="seq-no">#{{ asItem(item).seq_no + 1 }}</span>
-              <span class="section-path">{{ asItem(item).doc_a_section }}</span>
+          <div
+            class="diff-row"
+            :class="[getDiffClass(asItem(item)), { 'is-active': index === currentIndex }]"
+            @click="currentIndex = index"
+          >
+            <!-- 左侧：文档A -->
+            <div class="diff-cell cell-a">
+              <div class="cell-meta">
+                <el-tag :type="getLevelTag(asItem(item).diff_level)" size="small">
+                  {{ asItem(item).diff_level }}
+                </el-tag>
+                <span class="seq-no">#{{ asItem(item).seq_no + 1 }}</span>
+                <span class="section-path">{{ asItem(item).doc_a_section }}</span>
+              </div>
+              <div class="cell-text" v-html="renderText(asItem(item).doc_a_text, 'delete')" />
             </div>
-            <div class="cell-text" v-html="renderText(asItem(item).doc_a_text, 'delete')" />
-          </div>
 
-          <!-- 分隔线 -->
-          <div class="diff-divider">
-            <el-icon><arrow-right /></el-icon>
-          </div>
+            <!-- 分隔线 -->
+            <div class="diff-divider">
+              <el-icon><arrow-right /></el-icon>
+            </div>
 
-          <!-- 右侧：文档B -->
-          <div class="diff-cell cell-b">
-            <div class="cell-meta">
-              <span class="section-path">{{ asItem(item).doc_b_section }}</span>
-            </div>
-            <div class="cell-text" v-html="renderText(asItem(item).doc_b_text, 'insert')" />
-            <div v-if="asItem(item).semantic_desc" class="semantic-desc">
-              💡 {{ asItem(item).semantic_desc }}
-            </div>
-            <div v-if="asItem(item).risk_keywords" class="risk-keywords">
-              ⚠️ {{ asItem(item).risk_keywords }}
+            <!-- 右侧：文档B -->
+            <div class="diff-cell cell-b">
+              <div class="cell-meta">
+                <span class="section-path">{{ asItem(item).doc_b_section }}</span>
+              </div>
+              <div class="cell-text" v-html="renderText(asItem(item).doc_b_text, 'insert')" />
+              <div v-if="asItem(item).semantic_desc" class="semantic-desc">
+                💡 {{ asItem(item).semantic_desc }}
+              </div>
+              <div v-if="asItem(item).risk_keywords" class="risk-keywords">
+                ⚠️ {{ asItem(item).risk_keywords }}
+              </div>
             </div>
           </div>
-        </div>
+        </DynamicScrollerItem>
       </template>
-    </RecycleScroller>
+    </DynamicScroller>
   </div>
 </template>
 
 <style scoped>
-.diff-panel { display: flex; flex-direction: column; height: 100%; }
+.diff-panel { display: flex; flex-direction: column; height: 100%; flex: 1; min-width: 0; }
 
 .diff-toolbar {
   padding: 8px 12px; background: #fff;
@@ -168,7 +174,7 @@ defineExpose({ jumpTo })
 
 .diff-row {
   display: grid; grid-template-columns: 1fr 40px 1fr;
-  min-height: 120px; border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid #ebeef5;
   cursor: pointer; transition: background 0.15s;
 }
 .diff-row:hover { background: #f0f9ff; }

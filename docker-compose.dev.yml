@@ -11,10 +11,15 @@ services:
     volumes:
       - ./backend/app:/app/app          # 热重载：挂载源码
       - ./backend/app/services/prompts:/app/app/services/prompts
+      - /home/laigang/models/bge-m3:/models/bge-m3  # 本地 BGE-M3 模型，避免从网络下载
+      - /usr/share/fonts/opentype/noto:/host-fonts:ro  # 宿主机中文字体（PDF 生成用）
     environment:
       APP_ENV: dev
       LLM_API_MOCK: "true"              # 开发环境默认 Mock LLM，见 CLAUDE.md §10.1
       LOG_LEVEL: DEBUG
+      VECTOR_ENABLED: "true"            # 启用向量化
+      HF_HUB_OFFLINE: "1"              # 离线模式，禁止访问 huggingface.co
+      BGE_M3_MODEL_PATH: "/models/bge-m3"  # 本地模型路径
     command: >
       uvicorn app.main:app
       --host 0.0.0.0
