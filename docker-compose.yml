@@ -98,6 +98,8 @@ services:
     environment:
       ETCD_ENDPOINTS: lgdoc-milvus-etcd:2379
       MINIO_ADDRESS: lgdoc-minio:9000
+      MINIO_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY:-changeme}
     volumes:
       - lgdoc-milvus-data:/var/lib/milvus
     ports: []

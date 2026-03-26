@@ -12,6 +12,35 @@ from app.core.audit import log_operation
 router = APIRouter()
 
 
+@router.get("/tasks", response_model=ApiResponse[dict])
+async def list_compare_tasks(
+    page: int = 1,
+    page_size: int = 20,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[dict]:
+    repo = CompareRepository(db)
+    tasks, total = await repo.list_tasks(current_user["user_id"], page, page_size)
+    return ApiResponse.ok(data={
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "items": [
+            {
+                "task_id": t.id,
+                "task_name": t.task_name,
+                "status": t.status,
+                "progress": t.progress,
+                "total_diffs": t.total_diffs,
+                "critical_diffs": t.critical_diffs,
+                "created_at": t.created_at.isoformat(),
+                "finished_at": t.finished_at.isoformat() if t.finished_at else None,
+            }
+            for t in tasks
+        ],
+    })
+
+
 @router.post("/tasks", response_model=ApiResponse[dict])
 async def create_compare_task(
     req: CreateTaskRequest,

@@ -19,7 +19,8 @@ class User(Base, TimestampMixin):
     hashed_password: Mapped[str]           = mapped_column(String(256), nullable=False)
     department:      Mapped[str | None]    = mapped_column(String(128))
     role:            Mapped[UserRole]      = mapped_column(
-        Enum(UserRole), default=UserRole.VIEWER, nullable=False
+        Enum(UserRole, values_callable=lambda x: [e.value for e in x]),
+        default=UserRole.VIEWER, nullable=False
     )
     is_active:       Mapped[bool]          = mapped_column(default=True, nullable=False)
     last_login_at:   Mapped[datetime | None] = mapped_column(DateTime)

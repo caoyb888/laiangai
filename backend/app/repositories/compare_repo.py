@@ -87,6 +87,27 @@ class CompareRepository:
         await self.db.execute(insert(DiffItem), items)
         await self.db.flush()
 
+    async def list_tasks(
+        self,
+        creator_id: str,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[CompareTask], int]:
+        base = (
+            select(CompareTask)
+            .where(CompareTask.creator_id == creator_id, CompareTask.is_deleted == False)
+        )
+        count_result = await self.db.execute(
+            select(func.count()).select_from(base.subquery())
+        )
+        total = count_result.scalar_one()
+        items_result = await self.db.execute(
+            base.order_by(CompareTask.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        return list(items_result.scalars().all()), total
+
     async def list_diffs(
         self,
         task_id: str,
