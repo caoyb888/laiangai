@@ -180,7 +180,7 @@ onMounted(fetchDocs)
       <!-- 上传区（折叠） -->
       <el-collapse-transition>
         <el-card v-if="showUpload" class="upload-card" shadow="never">
-          <DocumentUploader category="other" :on-success="onUploadSuccess" />
+          <DocumentUploader category="other" @uploaded="onUploadSuccess" />
         </el-card>
       </el-collapse-transition>
 

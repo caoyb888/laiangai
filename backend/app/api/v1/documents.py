@@ -28,6 +28,14 @@ ALLOWED_MIME: dict[str, FileType] = {
     "text/plain": FileType.TXT,
 }
 
+# 扩展名兜底（浏览器可能发送 application/octet-stream），见 CLAUDE.md §6.3
+EXT_FALLBACK: dict[str, FileType] = {
+    ".docx": FileType.DOCX,
+    ".doc": FileType.DOC,
+    ".pdf": FileType.PDF,
+    ".txt": FileType.TXT,
+}
+
 
 @router.get("/", response_model=ApiResponse[dict])
 async def list_documents(
@@ -68,8 +76,10 @@ async def upload_document(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse[dict]:
-    # 1. 文件类型校验
-    if file.content_type not in ALLOWED_MIME:
+    # 1. 文件类型校验：先查 MIME，再用扩展名兜底（浏览器可能发送 octet-stream）
+    ext = "." + (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
+    file_type = ALLOWED_MIME.get(file.content_type or "") or EXT_FALLBACK.get(ext)
+    if file_type is None:
         return ApiResponse.error(ErrorCode.FILE_TYPE_NOT_ALLOWED,
                                  f"不支持的文件类型: {file.content_type}")
 
@@ -103,7 +113,7 @@ async def upload_document(
         id=doc_id,
         uploader_id=current_user["user_id"],
         file_name=file.filename,
-        file_type=ALLOWED_MIME[file.content_type],
+        file_type=file_type,
         file_size=len(content),
         minio_key=minio_key,
         checksum_md5=md5,

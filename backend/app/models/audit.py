@@ -27,7 +27,7 @@ class LlmAuditLog(Base):
     prompt_tokens:     Mapped[int]               = mapped_column(Integer, default=0, nullable=False)
     completion_tokens: Mapped[int]               = mapped_column(Integer, default=0, nullable=False)
     latency_ms:        Mapped[int | None]         = mapped_column(Integer)
-    status:            Mapped[LlmCallStatus]      = mapped_column(Enum(LlmCallStatus), nullable=False)
+    status:            Mapped[LlmCallStatus]      = mapped_column(Enum(LlmCallStatus, values_callable=lambda x: [e.value for e in x]), nullable=False)
     error_code:        Mapped[str | None]         = mapped_column(String(64))
     desensitized:      Mapped[bool]              = mapped_column(default=True, nullable=False)
     called_at:         Mapped[datetime]          = mapped_column(DateTime, server_default=func.now(), nullable=False, index=True)

@@ -36,7 +36,7 @@ class CompareTask(Base, TimestampMixin):
     # compare_level 用 String 存储 SET 值（逗号分隔），SQLAlchemy 不直接支持 MySQL SET 类型
     compare_level:  Mapped[str]          = mapped_column(String(64), default="char,semantic,risk", nullable=False)
     status:         Mapped[TaskStatus]   = mapped_column(
-        Enum(TaskStatus), default=TaskStatus.PENDING, nullable=False, index=True
+        Enum(TaskStatus, values_callable=lambda x: [e.value for e in x]), default=TaskStatus.PENDING, nullable=False, index=True
     )
     progress:       Mapped[int]          = mapped_column(SmallInteger, default=0, nullable=False)
     error_msg:      Mapped[str | None]   = mapped_column(Text)
@@ -53,9 +53,9 @@ class DiffItem(Base):
     id:             Mapped[str]          = mapped_column(String(36), primary_key=True)
     task_id:        Mapped[str]          = mapped_column(String(36), nullable=False, index=True)
     seq_no:         Mapped[int]          = mapped_column(Integer, nullable=False)
-    diff_type:      Mapped[DiffType]     = mapped_column(Enum(DiffType), nullable=False)
+    diff_type:      Mapped[DiffType]     = mapped_column(Enum(DiffType, values_callable=lambda x: [e.value for e in x]), nullable=False)
     diff_level:     Mapped[DiffLevel]    = mapped_column(
-        Enum(DiffLevel), default=DiffLevel.MINOR, nullable=False
+        Enum(DiffLevel, values_callable=lambda x: [e.value for e in x]), default=DiffLevel.MINOR, nullable=False
     )
     doc_a_section:  Mapped[str | None]   = mapped_column(String(512))
     doc_a_para_idx: Mapped[int | None]   = mapped_column(Integer)

@@ -17,7 +17,7 @@ class Report(Base):
     id:            Mapped[str]             = mapped_column(String(36), primary_key=True)
     task_id:       Mapped[str]             = mapped_column(String(36), nullable=False, index=True)
     creator_id:    Mapped[str]             = mapped_column(String(36), nullable=False)
-    report_format: Mapped[ReportFormat]    = mapped_column(Enum(ReportFormat), nullable=False)
+    report_format: Mapped[ReportFormat]    = mapped_column(Enum(ReportFormat, values_callable=lambda x: [e.value for e in x]), nullable=False)
     minio_key:     Mapped[str]             = mapped_column(String(1024), nullable=False)
     file_size:     Mapped[int | None]      = mapped_column(BigInteger)
     created_at:    Mapped[datetime]        = mapped_column(DateTime, server_default=func.now(), nullable=False)

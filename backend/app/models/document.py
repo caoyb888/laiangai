@@ -25,13 +25,13 @@ class Document(Base, TimestampMixin):
 
     uploader_id:  Mapped[str]           = mapped_column(String(36), nullable=False, index=True)
     file_name:    Mapped[str]           = mapped_column(String(512), nullable=False)
-    file_type:    Mapped[FileType]      = mapped_column(Enum(FileType), nullable=False)
+    file_type:    Mapped[FileType]      = mapped_column(Enum(FileType, values_callable=lambda x: [e.value for e in x]), nullable=False)
     file_size:    Mapped[int]           = mapped_column(BigInteger, nullable=False)
     page_count:   Mapped[int | None]    = mapped_column(Integer)
     minio_key:    Mapped[str]           = mapped_column(String(1024), nullable=False)
     checksum_md5: Mapped[str]           = mapped_column(String(32), nullable=False, index=True)
     parse_status: Mapped[ParseStatus]   = mapped_column(
-        Enum(ParseStatus), default=ParseStatus.PENDING, nullable=False, index=True
+        Enum(ParseStatus, values_callable=lambda x: [e.value for e in x]), default=ParseStatus.PENDING, nullable=False, index=True
     )
     parse_error:  Mapped[str | None]    = mapped_column(Text)
     category:     Mapped[str | None]    = mapped_column(String(64))
