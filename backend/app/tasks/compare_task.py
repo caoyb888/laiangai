@@ -34,6 +34,7 @@ async def run_compare_pipeline(task_id: str, user_id: str) -> None:
 
         try:
             await repo.update_task_status(task_id, TaskStatus.PROCESSING, progress=5)
+            await db.commit()
 
             # ─── Step 1: 加载两篇文档解析内容 ────────────────────────────────
             task = await repo.get_task(task_id)
@@ -49,6 +50,7 @@ async def run_compare_pipeline(task_id: str, user_id: str) -> None:
                        if b.get("block_type") in ("paragraph", "heading", "list_item")]
 
             await repo.update_task_status(task_id, TaskStatus.PROCESSING, progress=15)
+            await db.commit()
 
             # ─── Step 2: 字符级比对 ────────────────────────────────────────
             char_engine = CharDiffEngine()
@@ -57,6 +59,7 @@ async def run_compare_pipeline(task_id: str, user_id: str) -> None:
             changed_pairs = [p for p in diff_pairs if p.get("diff_type") != "equal"]
 
             await repo.update_task_status(task_id, TaskStatus.PROCESSING, progress=40)
+            await db.commit()
 
             # ─── Step 3: LLM 语义分析（字符级所有 modify 差异全量送入）──────
             # 向量过滤已移除（见文件头注释）
@@ -78,6 +81,7 @@ async def run_compare_pipeline(task_id: str, user_id: str) -> None:
             )
 
             await repo.update_task_status(task_id, TaskStatus.PROCESSING, progress=85)
+            await db.commit()
 
             # ─── Step 5: 风险识别 & 写入数据库 ─────────────────────────────
             diff_items_to_save = []
