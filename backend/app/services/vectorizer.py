@@ -6,7 +6,6 @@ import uuid
 
 import numpy as np
 import structlog
-from FlagEmbedding import BGEM3FlagModel
 from pymilvus import (
     Collection,
     CollectionSchema,
@@ -29,11 +28,12 @@ CHUNK_OVERLAP = 50       # 相邻块重叠字符数
 
 class VectorizerService:
 
-    _model: BGEM3FlagModel | None = None
+    _model: object | None = None
 
     @classmethod
-    def get_model(cls) -> BGEM3FlagModel:
+    def get_model(cls) -> object:
         if cls._model is None:
+            from FlagEmbedding import BGEM3FlagModel  # 懒加载，避免测试时 import 失败
             logger.info("加载 BGE-M3 模型（首次加载约20秒）")
             cls._model = BGEM3FlagModel(
                 "BAAI/bge-m3",

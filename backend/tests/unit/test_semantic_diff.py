@@ -247,7 +247,7 @@ class TestSearchSimilarParagraphs:
         mock_collection = MagicMock()
         mock_collection.search.return_value = [[hit]]
 
-        with patch("app.services.compare.semantic_diff.get_milvus_collection", return_value=mock_collection):
+        with patch("app.services.vectorizer.get_milvus_collection", return_value=mock_collection):
             result = engine.search_similar_paragraphs("查询文本", "doc-001", top_k=5)
 
         assert len(result) == 1
@@ -262,7 +262,7 @@ class TestSearchSimilarParagraphs:
         mock_collection = MagicMock()
         mock_collection.search.return_value = [[hit]]
 
-        with patch("app.services.compare.semantic_diff.get_milvus_collection", return_value=mock_collection):
+        with patch("app.services.vectorizer.get_milvus_collection", return_value=mock_collection):
             result = engine.search_similar_paragraphs("文本", "doc-002")
 
         assert result[0]["score"] == round(0.123456789, 4)
@@ -272,7 +272,7 @@ class TestSearchSimilarParagraphs:
         mock_collection = MagicMock()
         mock_collection.search.return_value = [[]]
 
-        with patch("app.services.compare.semantic_diff.get_milvus_collection", return_value=mock_collection):
+        with patch("app.services.vectorizer.get_milvus_collection", return_value=mock_collection):
             result = engine.search_similar_paragraphs("文本", "doc-003")
 
         assert result == []
@@ -283,7 +283,7 @@ class TestSearchSimilarParagraphs:
         mock_collection = MagicMock()
         mock_collection.search.return_value = [[]]
 
-        with patch("app.services.compare.semantic_diff.get_milvus_collection", return_value=mock_collection):
+        with patch("app.services.vectorizer.get_milvus_collection", return_value=mock_collection):
             engine.search_similar_paragraphs("搜索文本", "doc-004", top_k=3)
 
         call_kwargs = mock_collection.search.call_args
@@ -294,7 +294,7 @@ class TestSearchSimilarParagraphs:
         mock_collection = MagicMock()
         mock_collection.search.return_value = [[]]
 
-        with patch("app.services.compare.semantic_diff.get_milvus_collection", return_value=mock_collection):
+        with patch("app.services.vectorizer.get_milvus_collection", return_value=mock_collection):
             engine.search_similar_paragraphs("文本", "doc-xyz-999")
 
         call_args = mock_collection.search.call_args
@@ -308,7 +308,7 @@ class TestSearchSimilarParagraphs:
         mock_collection = MagicMock()
         mock_collection.search.return_value = [hits]
 
-        with patch("app.services.compare.semantic_diff.get_milvus_collection", return_value=mock_collection):
+        with patch("app.services.vectorizer.get_milvus_collection", return_value=mock_collection):
             result = engine.search_similar_paragraphs("文本", "doc-005", top_k=3)
 
         assert len(result) == 3

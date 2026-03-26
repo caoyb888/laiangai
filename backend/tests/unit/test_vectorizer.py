@@ -194,15 +194,21 @@ class TestEncode:
 
     def test_get_model_singleton(self) -> None:
         """get_model 应返回同一实例（懒加载单例）"""
+        import sys
         import numpy as np
 
         mock_model = MagicMock()
         mock_model.encode.return_value = {"dense_vecs": np.zeros((1, 1024))}
 
-        with patch("app.services.vectorizer.BGEM3FlagModel", return_value=mock_model):
+        mock_flag_module = MagicMock()
+        mock_flag_module.BGEM3FlagModel.return_value = mock_model
+
+        with patch.dict(sys.modules, {"FlagEmbedding": mock_flag_module}):
             m1 = VectorizerService.get_model()
             m2 = VectorizerService.get_model()
             assert m1 is m2
+            # 构造函数只被调用一次（单例）
+            mock_flag_module.BGEM3FlagModel.assert_called_once()
 
 
 # ──────────────────── vectorize_document 测试 ────────────────────

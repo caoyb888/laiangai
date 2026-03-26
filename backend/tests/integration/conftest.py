@@ -11,6 +11,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 from docx import Document as DocxDocument
 
+# SQLite 不支持 MySQL 专有类型，注册兼容映射（仅测试环境）
+from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
+if not hasattr(SQLiteTypeCompiler, "visit_LONGTEXT"):
+    SQLiteTypeCompiler.visit_LONGTEXT = lambda self, type_, **kw: "TEXT"  # type: ignore[attr-defined]
+
 
 # ── 生成测试用 JWT ────────────────────────────────────────────────────────────
 
@@ -28,16 +33,25 @@ async def client():
     """
     创建 httpx AsyncClient，使用 ASGI Transport 直连 FastAPI app。
     通过 patch 阻止 init_minio / init_milvus 连接外部服务。
+    使用 SQLite 内存数据库并在测试前建表，测试后销毁。
     """
     with (
         patch("app.core.minio_client.init_minio", new_callable=AsyncMock),
         patch("app.core.milvus_client.init_milvus", new_callable=AsyncMock),
     ):
+        from app.core.db import engine
+        from app.models.base import Base
+        # 建表（SQLite 测试库，每次测试周期重建）
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
         from app.main import app
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as c:
             yield c
+        # 测试结束后清理表
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
 
 
 @pytest.fixture
