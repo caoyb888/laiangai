@@ -44,7 +44,7 @@ async def dispatch_parse(doc_id: str, content: bytes, file_type: FileType) -> No
                 ),
             )
 
-            # 更新文档元数据
+            # 更新文档元数据，解析状态设为 DONE（与向量化解耦）
             await repo.update_meta(
                 doc_id,
                 title=parsed.meta.title,
@@ -52,13 +52,16 @@ async def dispatch_parse(doc_id: str, content: bytes, file_type: FileType) -> No
                 page_count=parsed.meta.page_count,
                 parse_status=ParseStatus.DONE,
             )
-
-            # 异步触发向量化（后台任务链，任务9实现）
-            from app.services.vectorizer import vectorize_document
-            await vectorize_document(doc_id, parsed)
-
             await db.commit()
             logger.info("文档解析完成", doc_id=doc_id, file_type=file_type)
+
+            # 向量化单独执行，失败不影响解析状态
+            try:
+                from app.services.vectorizer import vectorize_document
+                await vectorize_document(doc_id, parsed)
+            except Exception as vec_err:
+                logger.warning("向量化失败（不影响解析结果，语义比对功能暂不可用）",
+                               doc_id=doc_id, error=str(vec_err))
 
         except Exception as e:
             await repo.update_parse_status(doc_id, ParseStatus.FAILED, str(e))
