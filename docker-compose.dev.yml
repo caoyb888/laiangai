@@ -43,7 +43,7 @@ services:
 
   lgdoc-redis:
     ports:
-      - "127.0.0.1:6379:6379"          # 开发时允许本地直连 Redis
+      - "127.0.0.1:6380:6379"          # 开发时允许本地直连 Redis（6379 被宿主机占用，映射到 6380）
 
   lgdoc-minio:
     ports:
