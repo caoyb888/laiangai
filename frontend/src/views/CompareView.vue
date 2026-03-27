@@ -4,11 +4,14 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import DiffPanel from '@/components/compare/DiffPanel.vue'
 import DiffNavigator from '@/components/compare/DiffNavigator.vue'
+import ThemeSwitcher from '@/components/common/ThemeSwitcher.vue'
 import request from '@/api/request'
 import type { DiffItem, CompareTask } from '@/types/compare'
+import { useThemeStore } from '@/stores/theme'
 
 const route = useRoute()
 const taskId = route.params.taskId as string
+const themeStore = useThemeStore()
 
 const task = ref<CompareTask | null>(null)
 const diffItems = ref<DiffItem[]>([])
@@ -84,7 +87,7 @@ onUnmounted(stopPolling)
 </script>
 
 <template>
-  <div class="compare-view">
+  <div :class="['compare-view', themeStore.theme]">
     <!-- 顶部状态栏 -->
     <div class="compare-topbar">
       <div class="task-info">
@@ -100,6 +103,7 @@ onUnmounted(stopPolling)
         </el-tag>
       </div>
       <div class="export-actions">
+        <ThemeSwitcher />
         <el-button
           size="small" :loading="exporting"
           @click="exportReport('pdf')"
@@ -150,14 +154,50 @@ onUnmounted(stopPolling)
 
 <style scoped>
 .compare-view { display: flex; flex-direction: column; height: 100vh; }
+
 .compare-topbar {
-  height: var(--header-height); display: flex; align-items: center;
-  justify-content: space-between; padding: 0 16px;
-  border-bottom: 1px solid #dcdfe6; background: #fff; flex-shrink: 0;
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--topbar-border);
+  background: var(--topbar-bg);
+  flex-shrink: 0;
+  transition: background 0.25s, border-color 0.25s;
 }
-.task-info { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; }
-.export-actions { display: flex; gap: 8px; }
+
+.task-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--nav-text);
+  transition: color 0.25s;
+}
+
+.export-actions { display: flex; gap: 8px; align-items: center; }
+
 .compare-body { flex: 1; display: flex; overflow: hidden; }
 .loading-state { flex: 1; display: flex; flex-direction: column;
                  align-items: center; justify-content: center; gap: 16px; }
+
+/* ── 深蓝科技主题覆盖 ─────────────────────────────────────── */
+.compare-view.tech .compare-topbar :deep(.el-button) {
+  color: var(--nav-text);
+  border-color: rgba(79, 142, 247, 0.35);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.compare-view.tech .compare-topbar :deep(.el-button:hover) {
+  background: rgba(79, 142, 247, 0.15);
+  border-color: rgba(79, 142, 247, 0.6);
+  color: #ffffff;
+}
+
+.compare-view.tech .loading-state {
+  background: var(--page-bg);
+  color: var(--nav-text);
+}
 </style>

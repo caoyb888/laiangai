@@ -1,3 +1,49 @@
+/* ═══════════════════════════════════════════════════════════
+   主题 CSS 变量
+   两套主题通过 <html class="theme-xxx"> 切换，见 stores/theme.ts
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── 默认/极简白主题 ──────────────────────────────────────── */
+:root,
+html.theme-minimal {
+  --page-bg: #f5f7fa;
+  --nav-bg: #ffffff;
+  --nav-border: var(--el-border-color-light, #e4e7ed);
+  --nav-brand-color: #2563eb;
+  --nav-text: #374151;
+  --nav-text-secondary: #6b7280;
+  --topbar-bg: #ffffff;
+  --topbar-border: #dcdfe6;
+  --login-bg-start: #eef2ff;
+  --login-bg-end: #f0f2f5;
+  --login-card-bg: #ffffff;
+  --login-card-border: #e5e7eb;
+  --login-card-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  --login-title-color: #111827;
+  --login-subtitle-color: #6b7280;
+  --login-label-color: #374151;
+}
+
+/* ── 深蓝科技主题 ─────────────────────────────────────────── */
+html.theme-tech {
+  --page-bg: #0d1f3c;
+  --nav-bg: #0a1628;
+  --nav-border: rgba(79, 142, 247, 0.22);
+  --nav-brand-color: #60a5fa;
+  --nav-text: rgba(255, 255, 255, 0.88);
+  --nav-text-secondary: rgba(255, 255, 255, 0.52);
+  --topbar-bg: #0a1628;
+  --topbar-border: rgba(79, 142, 247, 0.22);
+  --login-bg-start: #0a1628;
+  --login-bg-end: #0d2d5e;
+  --login-card-bg: rgba(255, 255, 255, 0.07);
+  --login-card-border: rgba(79, 142, 247, 0.32);
+  --login-card-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(79, 142, 247, 0.15);
+  --login-title-color: #ffffff;
+  --login-subtitle-color: rgba(255, 255, 255, 0.6);
+  --login-label-color: rgba(255, 255, 255, 0.75);
+}
+
 /* 差异颜色体系——全局统一，禁止局部硬编码，见 CLAUDE.md §6.2 */
 :root {
   --diff-delete-bg:     #ffd7d7;

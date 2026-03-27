@@ -5,7 +5,9 @@ import { ElMessage } from 'element-plus'
 import { View, Download, SwitchButton } from '@element-plus/icons-vue'
 import request from '@/api/request'
 import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores/theme'
 import { useLlmMode } from '@/composables/useLlmMode'
+import ThemeSwitcher from '@/components/common/ThemeSwitcher.vue'
 import type { CompareTask } from '@/types/compare'
 
 // ── LLM 模式切换 ──────────────────────────────────────────
@@ -13,6 +15,7 @@ const { llmMock, loading: llmModeLoading, fetchLlmMode, toggleLlmMode } = useLlm
 
 const router = useRouter()
 const auth = useAuthStore()
+const themeStore = useThemeStore()
 
 // ── 任务列表 ─────────────────────────────────────────────
 const tasks = ref<CompareTask[]>([])
@@ -86,7 +89,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="report-page">
+  <div :class="['report-page', themeStore.theme]">
     <!-- 顶部导航 -->
     <header class="top-nav">
       <span class="brand">莱钢集团 · AI 文档比对系统</span>
@@ -95,6 +98,7 @@ onMounted(() => {
         <el-button text @click="router.push('/reports')">报告列表</el-button>
       </nav>
       <div class="nav-right">
+        <ThemeSwitcher />
         <span class="username">{{ auth.displayName }}</span>
         <el-button text :icon="SwitchButton" @click="handleLogout">退出</el-button>
       </div>
@@ -219,7 +223,7 @@ onMounted(() => {
 <style scoped>
 .report-page {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: var(--page-bg);
   display: flex;
   flex-direction: column;
 }
@@ -230,18 +234,20 @@ onMounted(() => {
   gap: 24px;
   padding: 0 24px;
   height: 56px;
-  background: #fff;
-  border-bottom: 1px solid var(--el-border-color-light);
+  background: var(--nav-bg);
+  border-bottom: 1px solid var(--nav-border);
   position: sticky;
   top: 0;
   z-index: 100;
+  transition: background 0.25s, border-color 0.25s;
 }
 
 .brand {
   font-weight: 700;
   font-size: 16px;
-  color: var(--el-color-primary);
+  color: var(--nav-brand-color);
   white-space: nowrap;
+  transition: color 0.25s;
 }
 
 .nav-links { display: flex; gap: 4px; }
@@ -255,7 +261,39 @@ onMounted(() => {
 
 .username {
   font-size: 14px;
-  color: var(--el-text-color-secondary);
+  color: var(--nav-text-secondary);
+  transition: color 0.25s;
+}
+
+/* ── 深蓝科技主题覆盖 ─────────────────────────────────────── */
+.report-page.tech .top-nav :deep(.el-button--text),
+.report-page.tech .top-nav :deep(.el-button.is-text) {
+  color: var(--nav-text);
+}
+
+.report-page.tech .top-nav :deep(.el-button--text:hover),
+.report-page.tech .top-nav :deep(.el-button.is-text:hover) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.report-page.tech .main-content :deep(.el-card) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(79, 142, 247, 0.2);
+}
+
+.report-page.tech .main-content :deep(.el-table) {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--nav-text);
+}
+
+.report-page.tech .main-content :deep(.el-table th.el-table__cell) {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.report-page.tech .main-content :deep(.el-table tr:hover > td) {
+  background: rgba(79, 142, 247, 0.08) !important;
 }
 
 .main-content {
