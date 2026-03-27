@@ -75,11 +75,15 @@ async function handleDelete(doc: DocItem) {
 
 // ── 比对选择 ─────────────────────────────────────────────
 const selected = ref<DocItem[]>([])
+const baseDocId = ref<string | null>(null)
 
 function toggleSelect(doc: DocItem) {
   const idx = selected.value.findIndex(d => d.document_id === doc.document_id)
   if (idx >= 0) {
     selected.value.splice(idx, 1)
+    if (baseDocId.value === doc.document_id) {
+      baseDocId.value = selected.value.length > 0 ? selected.value[0].document_id : null
+    }
   } else {
     if (selected.value.length >= 2) {
       ElMessage.warning('最多选择 2 份文档进行比对')
@@ -90,11 +94,23 @@ function toggleSelect(doc: DocItem) {
       return
     }
     selected.value.push(doc)
+    if (baseDocId.value === null) {
+      baseDocId.value = doc.document_id
+    }
   }
 }
 
 function isSelected(doc: DocItem) {
   return selected.value.some(d => d.document_id === doc.document_id)
+}
+
+function docRole(doc: DocItem): 'base' | 'compare' | null {
+  if (!isSelected(doc)) return null
+  return doc.document_id === baseDocId.value ? 'base' : 'compare'
+}
+
+function setBase(doc: DocItem) {
+  baseDocId.value = doc.document_id
 }
 
 // ── 发起比对 ─────────────────────────────────────────────
@@ -105,12 +121,14 @@ async function startCompare() {
     ElMessage.warning('请选择 2 份文档')
     return
   }
+  const base = selected.value.find(d => d.document_id === baseDocId.value)!
+  const compare = selected.value.find(d => d.document_id !== baseDocId.value)!
   comparing.value = true
   try {
     const res = await request.post('/compare/tasks', {
-      doc_a_id: selected.value[0].document_id,
-      doc_b_id: selected.value[1].document_id,
-      task_name: `${selected.value[0].file_name} vs ${selected.value[1].file_name}`,
+      doc_a_id: base.document_id,
+      doc_b_id: compare.document_id,
+      task_name: `${base.file_name} vs ${compare.file_name}`,
     })
     ElMessage.success('比对任务已创建')
     router.push(`/compare/${res.data.task_id}`)
@@ -209,7 +227,9 @@ onMounted(() => {
       <!-- 已选提示 -->
       <el-alert
         v-if="selected.length > 0"
-        :title="`已选：${selected.map(d => d.file_name).join(' vs ')}`"
+        :title="selected.length === 2
+          ? `基准：${selected.find(d => d.document_id === baseDocId)?.file_name}　对比：${selected.find(d => d.document_id !== baseDocId)?.file_name}`
+          : `已选：${selected[0].file_name}（将作为基准文档）`"
         type="info"
         show-icon
         :closable="false"
@@ -258,7 +278,7 @@ onMounted(() => {
           <template #default="{ row }">{{ formatDate(row.created_at) }}</template>
         </el-table-column>
 
-        <el-table-column label="操作" width="80" fixed="right">
+        <el-table-column label="操作" width="80">
           <template #default="{ row }">
             <el-button
               text
@@ -267,6 +287,26 @@ onMounted(() => {
               size="small"
               @click.stop="handleDelete(row)"
             />
+          </template>
+        </el-table-column>
+
+        <el-table-column label="角色" width="90" fixed="right">
+          <template #default="{ row }">
+            <template v-if="docRole(row) === 'base'">
+              <el-tag size="small" type="primary" effect="dark">基准文档</el-tag>
+            </template>
+            <template v-else-if="docRole(row) === 'compare'">
+              <el-tag
+                size="small"
+                type="info"
+                effect="plain"
+                style="cursor:pointer"
+                @click.stop="setBase(row)"
+              >对比文档</el-tag>
+            </template>
+            <template v-else>
+              <span class="role-hint">基准/对比</span>
+            </template>
           </template>
         </el-table-column>
       </el-table>
@@ -357,22 +397,53 @@ onMounted(() => {
 }
 
 .doc-page.tech .main-content :deep(.el-table) {
-  background: rgba(255, 255, 255, 0.04);
+  background: transparent;
   color: var(--nav-text);
 }
 
+/* 表头 */
 .doc-page.tech .main-content :deep(.el-table th.el-table__cell) {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.65);
+  background: rgba(79, 142, 247, 0.18);
+  color: #ffffff !important;
+  border-bottom-color: rgba(79, 142, 247, 0.25);
 }
 
-.doc-page.tech .main-content :deep(.el-table tr:hover > td) {
-  background: rgba(79, 142, 247, 0.08) !important;
+/* 普通行 */
+.doc-page.tech .main-content :deep(.el-table td.el-table__cell) {
+  background: rgba(13, 31, 60, 0.85);
+  color: rgba(255, 255, 255, 0.82);
+  border-bottom-color: rgba(79, 142, 247, 0.12);
 }
 
-.doc-page.tech .main-content :deep(.el-table__border-left-patch),
+/* 斑马纹奇数行 */
+.doc-page.tech .main-content :deep(.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell) {
+  background: rgba(79, 142, 247, 0.1);
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+/* hover 行 */
+.doc-page.tech .main-content :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background: rgba(79, 142, 247, 0.18) !important;
+}
+
+/* 表头单元格内所有文字 */
+.doc-page.tech .main-content :deep(.el-table th.el-table__cell .cell) {
+  color: #ffffff !important;
+}
+
+/* 斑马纹行单元格内所有文字 */
+.doc-page.tech .main-content :deep(.el-table--striped .el-table__row--striped td.el-table__cell .cell) {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+/* 表格整体包裹层 & 分割线 */
 .doc-page.tech .main-content :deep(.el-table__inner-wrapper::before) {
-  background: rgba(79, 142, 247, 0.15);
+  background: rgba(79, 142, 247, 0.2);
+}
+
+/* 固定列阴影区域 */
+.doc-page.tech .main-content :deep(.el-table__body-wrapper) {
+  background: transparent;
 }
 
 .doc-page.tech .total-hint {
@@ -423,5 +494,10 @@ onMounted(() => {
 
 :deep(.el-table__row) {
   cursor: pointer;
+}
+
+.role-hint {
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
 }
 </style>
