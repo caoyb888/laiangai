@@ -2,6 +2,7 @@
 import { ref, computed, nextTick } from 'vue'
 import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
+import DiffMatchPatch from 'diff-match-patch'
 import type { DiffItem } from '@/types/compare'
 
 const props = defineProps<{
@@ -13,6 +14,8 @@ const props = defineProps<{
 defineEmits<{
   reviewItem: [itemId: string]
 }>()
+
+const dmp = new DiffMatchPatch()
 
 const currentIndex = ref(0)
 const filterLevel = ref<string>('ALL')
@@ -50,17 +53,59 @@ function getLevelTag(level: string): '' | 'danger' | 'warning' | 'success' {
   return map[level] ?? ''
 }
 
-// 辅助函数：将文本用 <mark> 包裹高亮（简版，完整版用 char_spans 数据）
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function renderText(text: string | null, type: 'insert' | 'delete'): string {
+/**
+ * 对 modify 类型进行字符级 diff，渲染左栏（删除标记）
+ * 仅提取 EQUAL(-0) 和 DELETE(-1) 操作，INSERT 在右栏展示
+ */
+function renderModifyA(textA: string, textB: string): string {
+  const diffs = dmp.diff_main(textA, textB)
+  dmp.diff_cleanupSemantic(diffs)
+  return diffs
+    .filter(([op]) => op !== DiffMatchPatch.DIFF_INSERT)
+    .map(([op, text]) => {
+      const escaped = escapeHtml(text)
+      if (op === DiffMatchPatch.DIFF_DELETE) {
+        return `<span class="diff-delete-mark">${escaped}</span>`
+      }
+      return escaped
+    })
+    .join('')
+}
+
+/**
+ * 对 modify 类型进行字符级 diff，渲染右栏（新增标记）
+ * 仅提取 EQUAL(0) 和 INSERT(1) 操作，DELETE 在左栏展示
+ */
+function renderModifyB(textA: string, textB: string): string {
+  const diffs = dmp.diff_main(textA, textB)
+  dmp.diff_cleanupSemantic(diffs)
+  return diffs
+    .filter(([op]) => op !== DiffMatchPatch.DIFF_DELETE)
+    .map(([op, text]) => {
+      const escaped = escapeHtml(text)
+      if (op === DiffMatchPatch.DIFF_INSERT) {
+        return `<span class="diff-insert-mark">${escaped}</span>`
+      }
+      return escaped
+    })
+    .join('')
+}
+
+/**
+ * 非 modify 类型的整块渲染（delete / insert / move）
+ */
+function renderText(text: string | null, type: 'insert' | 'delete' | 'move'): string {
   if (!text) return '<span class="empty-text">（无内容）</span>'
-  const cls = type === 'delete' ? 'diff-delete-mark' : 'diff-insert-mark'
-  return `<span class="${cls}">${escapeHtml(text)}</span>`
+  const escaped = escapeHtml(text)
+  if (type === 'delete') return `<span class="diff-delete-mark">${escaped}</span>`
+  if (type === 'insert') return `<span class="diff-insert-mark">${escaped}</span>`
+  return `<span class="diff-move-mark">${escaped}</span>`
 }
 
 // vue-virtual-scroller slot 类型为 unknown，用此辅助函数显式转型
@@ -127,7 +172,13 @@ defineExpose({ jumpTo })
                 <span class="seq-no">#{{ asItem(item).seq_no + 1 }}</span>
                 <span class="section-path">{{ asItem(item).doc_a_section }}</span>
               </div>
-              <div class="cell-text" v-html="renderText(asItem(item).doc_a_text, 'delete')" />
+              <!-- modify：字符级高亮；其他类型：整块标记 -->
+              <div
+                class="cell-text"
+                v-html="asItem(item).diff_type === 'modify'
+                  ? renderModifyA(asItem(item).doc_a_text ?? '', asItem(item).doc_b_text ?? '')
+                  : renderText(asItem(item).doc_a_text, asItem(item).diff_type === 'insert' ? 'insert' : asItem(item).diff_type === 'move' ? 'move' : 'delete')"
+              />
             </div>
 
             <!-- 分隔线 -->
@@ -140,7 +191,13 @@ defineExpose({ jumpTo })
               <div class="cell-meta">
                 <span class="section-path">{{ asItem(item).doc_b_section }}</span>
               </div>
-              <div class="cell-text" v-html="renderText(asItem(item).doc_b_text, 'insert')" />
+              <!-- modify：字符级高亮；其他类型：整块标记 -->
+              <div
+                class="cell-text"
+                v-html="asItem(item).diff_type === 'modify'
+                  ? renderModifyB(asItem(item).doc_a_text ?? '', asItem(item).doc_b_text ?? '')
+                  : renderText(asItem(item).doc_b_text, asItem(item).diff_type === 'delete' ? 'delete' : asItem(item).diff_type === 'move' ? 'move' : 'insert')"
+              />
               <div v-if="asItem(item).semantic_desc" class="semantic-desc">
                 💡 {{ asItem(item).semantic_desc }}
               </div>
@@ -187,9 +244,26 @@ defineExpose({ jumpTo })
 .diff-modify .cell-b { background: var(--diff-insert-bg); }
 .diff-move   { background: var(--diff-move-bg); }
 
-.diff-insert-mark { background: var(--diff-insert-bg); color: var(--diff-insert-text); }
-.diff-delete-mark { background: var(--diff-delete-bg); color: var(--diff-delete-text);
-                    text-decoration: line-through; }
+/* 字符级内联高亮标记（见 CLAUDE.md §6.2，颜色通过 CSS 变量统一管理）*/
+.diff-insert-mark {
+  background: var(--diff-insert-bg);
+  color: var(--diff-insert-text);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.diff-delete-mark {
+  background: var(--diff-delete-bg);
+  color: var(--diff-delete-text);
+  text-decoration: line-through;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.diff-move-mark {
+  background: var(--diff-move-bg);
+  color: var(--diff-move-text);
+  border-radius: 2px;
+  padding: 0 1px;
+}
 
 .diff-cell { padding: 10px 12px; }
 .cell-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
@@ -199,7 +273,8 @@ defineExpose({ jumpTo })
 .cell-text { font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
 .semantic-desc { margin-top: 6px; font-size: 12px; color: #409eff;
                  background: #ecf5ff; padding: 4px 8px; border-radius: 4px; }
-.risk-keywords { margin-top: 4px; font-size: 12px; color: var(--diff-risk-critical); }
+.risk-keywords { margin-top: 4px; font-size: 12px; color: var(--diff-risk-critical);
+                 font-weight: 600; }
 
 .diff-divider { display: flex; align-items: center; justify-content: center;
                 background: #fafafa; border-left: 1px solid #ebeef5;
