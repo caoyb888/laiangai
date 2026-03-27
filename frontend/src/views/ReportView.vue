@@ -32,6 +32,9 @@ async function fetchTasks() {
     })
     tasks.value = res.data.items
     total.value = res.data.total
+  } catch (err: unknown) {
+    const msg = (err as Error).message || '获取比对历史失败，请检查服务是否正常'
+    ElMessage.error(msg)
   } finally {
     listLoading.value = false
   }

@@ -40,6 +40,9 @@ async function fetchDocs() {
     })
     docs.value = res.data.items
     total.value = res.data.total
+  } catch (err: unknown) {
+    const msg = (err as Error).message || '获取文档列表失败，请检查服务是否正常'
+    ElMessage.error(msg)
   } finally {
     listLoading.value = false
   }

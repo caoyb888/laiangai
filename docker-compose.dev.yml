@@ -38,6 +38,8 @@ services:
       - ./frontend/public:/app/public
       - ./frontend/index.html:/app/index.html
       - ./frontend/vite.config.ts:/app/vite.config.ts
+    environment:
+      VITE_API_TARGET: "http://lgdoc-backend:8000"  # 容器内用 Docker 内网主机名
     command: pnpm dev --host 0.0.0.0
 
   lgdoc-nginx:

@@ -17,7 +17,12 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': { target: 'http://lgdoc-backend:8000', changeOrigin: true },
+      // 本地 pnpm dev：docker-compose 将后端 8000 端口映射到 localhost:8000
+      // Docker 内 Vite dev：通过 VITE_API_TARGET=http://lgdoc-backend:8000 覆盖
+      '/api': {
+        target: process.env.VITE_API_TARGET ?? 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
 })
